@@ -20,7 +20,7 @@ on:
         default: westeurope
 
 permissions:
-  packages: write
+  contents: read
 
 env:
   AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUB_ID }}
@@ -30,6 +30,8 @@ env:
 
 jobs:
   images:
+    permissions:
+      packages: write
     name: "Build volume test images"
     runs-on: ubuntu-latest
     defaults:
@@ -37,11 +39,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.17.13'
+          go-version: '1.19.6'
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 

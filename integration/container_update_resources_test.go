@@ -57,6 +57,15 @@ func checkMemorySwapLimit(t *testing.T, spec *runtimespec.Spec, memLimit *int64)
 	}
 }
 
+func checkMemoryLimitInContainerStatus(t *testing.T, status *runtime.ContainerStatus, memLimit int64) {
+	t.Helper()
+	require.NotNil(t, status)
+	require.NotNil(t, status.Resources)
+	require.NotNil(t, status.Resources.Linux)
+	require.NotNil(t, status.Resources.Linux.MemoryLimitInBytes)
+	assert.Equal(t, memLimit, status.Resources.Linux.MemoryLimitInBytes)
+}
+
 func getCgroupSwapLimitForTask(t *testing.T, task containerd.Task) uint64 {
 	if cgroups.Mode() == cgroups.Unified {
 		groupPath, err := cgroupsv2.PidGroupPath(int(task.Pid()))
@@ -71,7 +80,7 @@ func getCgroupSwapLimitForTask(t *testing.T, task containerd.Task) uint64 {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return stat.Memory.SwapLimit
+		return stat.Memory.SwapLimit + stat.Memory.UsageLimit
 	}
 	cgroup, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
 	if err != nil {
@@ -160,11 +169,6 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	expectedBaseSwap := baseSwapLimit
 	expectedIncreasedSwap := increasedSwapLimit
 
-	if cgroups.Mode() == cgroups.Unified {
-		expectedBaseSwap = baseSwapLimit - memoryLimit
-		expectedIncreasedSwap = increasedSwapLimit - memoryLimit
-	}
-
 	t.Log("Create a container with memory limit but no swap")
 	cnConfig := ContainerConfig(
 		"container",
@@ -225,6 +229,10 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 
 	EnsureImageExists(t, pauseImage)
 
+	expectedSwapLimit := func(memoryLimit int64) *int64 {
+		return &memoryLimit
+	}
+
 	t.Log("Create a container with memory limit")
 	cnConfig := ContainerConfig(
 		"container",
@@ -242,6 +250,7 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	spec, err := container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 200*1024*1024)
+	checkMemorySwapLimit(t, spec, expectedSwapLimit(200*1024*1024))
 
 	t.Log("Update container memory limit after created")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
@@ -253,6 +262,7 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 400*1024*1024)
+	checkMemorySwapLimit(t, spec, expectedSwapLimit(400*1024*1024))
 
 	t.Log("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
@@ -265,6 +275,8 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(400*1024*1024), stat.Memory.Usage.Limit)
+	swapLimit := getCgroupSwapLimitForTask(t, task)
+	assert.Equal(t, uint64(400*1024*1024), swapLimit)
 
 	t.Log("Update container memory limit after started")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
@@ -276,9 +288,60 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 800*1024*1024)
+	checkMemorySwapLimit(t, spec, expectedSwapLimit(800*1024*1024))
 
 	t.Log("Check memory limit in cgroup")
 	stat, err = cgroup.Stat(cgroups.IgnoreNotExist)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(800*1024*1024), stat.Memory.Usage.Limit)
+	swapLimit = getCgroupSwapLimitForTask(t, task)
+	assert.Equal(t, uint64(800*1024*1024), swapLimit)
+}
+
+func TestUpdateContainerResources_StatusUpdated(t *testing.T) {
+	t.Log("Create a sandbox")
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
+
+	EnsureImageExists(t, pauseImage)
+
+	t.Log("Create a container with memory limit")
+	cnConfig := ContainerConfig(
+		"container",
+		pauseImage,
+		WithResources(&runtime.LinuxContainerResources{
+			MemoryLimitInBytes: 200 * 1024 * 1024,
+		}),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Check memory limit in container status")
+	status, err := runtimeService.ContainerStatus(cn)
+	checkMemoryLimitInContainerStatus(t, status, 200*1024*1024)
+	require.NoError(t, err)
+
+	t.Log("Update container memory limit after created")
+	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
+		MemoryLimitInBytes: 400 * 1024 * 1024,
+	}, nil)
+	require.NoError(t, err)
+
+	t.Log("Check memory limit in container status")
+	status, err = runtimeService.ContainerStatus(cn)
+	checkMemoryLimitInContainerStatus(t, status, 400*1024*1024)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	t.Log("Update container memory limit after started")
+	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
+		MemoryLimitInBytes: 800 * 1024 * 1024,
+	}, nil)
+	require.NoError(t, err)
+
+	t.Log("Check memory limit in container status")
+	status, err = runtimeService.ContainerStatus(cn)
+	checkMemoryLimitInContainerStatus(t, status, 800*1024*1024)
+	require.NoError(t, err)
 }

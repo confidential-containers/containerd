@@ -363,3 +363,11 @@ func (cm *criManager) ReopenContainerLog(ctx context.Context, r *runtime.ReopenC
 	}
 	return i.ReopenContainerLog(ctx, r)
 }
+
+func (cm *criManager) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
+	return cm.c.CheckpointContainer(ctx, r)
+}
+
+func (cm *criManager) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
+	return cm.c.GetContainerEvents(r, s)
+}

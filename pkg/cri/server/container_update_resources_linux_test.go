@@ -26,11 +26,18 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	criopts "github.com/containerd/containerd/pkg/cri/opts"
 )
 
 func TestUpdateOCILinuxResource(t *testing.T) {
 	oomscoreadj := new(int)
 	*oomscoreadj = -500
+	expectedSwap := func(swap int64) *int64 {
+		if criopts.SwapControllerAvailable() {
+			return &swap
+		}
+		return nil
+	}
 	for desc, test := range map[string]struct {
 		spec      *runtimespec.Spec
 		request   *runtime.UpdateContainerResourcesRequest
@@ -70,7 +77,10 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
 					Resources: &runtimespec.LinuxResources{
-						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						Memory: &runtimespec.LinuxMemory{
+							Limit: proto.Int64(54321),
+							Swap:  expectedSwap(54321),
+						},
 						CPU: &runtimespec.LinuxCPU{
 							Shares: proto.Uint64(4444),
 							Quota:  proto.Int64(5555),
@@ -113,7 +123,10 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
 					Resources: &runtimespec.LinuxResources{
-						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						Memory: &runtimespec.LinuxMemory{
+							Limit: proto.Int64(54321),
+							Swap:  expectedSwap(54321),
+						},
 						CPU: &runtimespec.LinuxCPU{
 							Shares: proto.Uint64(4444),
 							Quota:  proto.Int64(5555),
@@ -151,7 +164,10 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
 					Resources: &runtimespec.LinuxResources{
-						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						Memory: &runtimespec.LinuxMemory{
+							Limit: proto.Int64(54321),
+							Swap:  expectedSwap(54321),
+						},
 						CPU: &runtimespec.LinuxCPU{
 							Shares: proto.Uint64(4444),
 							Quota:  proto.Int64(5555),
@@ -197,7 +213,10 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
 					Resources: &runtimespec.LinuxResources{
-						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						Memory: &runtimespec.LinuxMemory{
+							Limit: proto.Int64(54321),
+							Swap:  expectedSwap(54321),
+						},
 						CPU: &runtimespec.LinuxCPU{
 							Shares: proto.Uint64(4444),
 							Quota:  proto.Int64(5555),
