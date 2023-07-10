@@ -443,6 +443,8 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 			return status
 		}
 
+		log.L.Infof("### copyResourcesToStatus %+v", spec.Linux.Resources)
+
 		if spec.Linux.Resources.CPU != nil {
 			if spec.Linux.Resources.CPU.Period != nil {
 				status.Resources.Linux.CpuPeriod = int64(*spec.Linux.Resources.CPU.Period)

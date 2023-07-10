@@ -17,13 +17,16 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/nri/pkg/log"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
@@ -177,11 +180,24 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 
 	if res := config.GetLinux().GetResources(); res != nil {
+		// Add devices from CDI annotations
+		_, devsFromAnnotations, err := cdi.ParseAnnotations(config.Annotations)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CDI device annotations: %w", err)
+		}
+
+		for _, devs := range devsFromAnnotations {
+			specOpts = append(specOpts,
+				customopts.WithAnnotation(annotations.SandboxCDIDevices, devs),
+			)
+		}
+
 		specOpts = append(specOpts,
 			customopts.WithAnnotation(annotations.SandboxCPUPeriod, strconv.FormatInt(res.CpuPeriod, 10)),
 			customopts.WithAnnotation(annotations.SandboxCPUQuota, strconv.FormatInt(res.CpuQuota, 10)),
 			customopts.WithAnnotation(annotations.SandboxCPUShares, strconv.FormatInt(res.CpuShares, 10)),
 			customopts.WithAnnotation(annotations.SandboxMem, strconv.FormatInt(res.MemoryLimitInBytes, 10)))
+
 	}
 
 	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))

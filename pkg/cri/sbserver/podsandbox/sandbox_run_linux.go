@@ -17,12 +17,14 @@
 package podsandbox
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/nri/pkg/log"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -159,6 +161,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 
 	if res := config.GetLinux().GetResources(); res != nil {
+		log.Infof(context.TODO(), "### SBSERVER resources: %+v", res)
 		specOpts = append(specOpts,
 			customopts.WithAnnotation(annotations.SandboxCPUPeriod, strconv.FormatInt(res.CpuPeriod, 10)),
 			customopts.WithAnnotation(annotations.SandboxCPUQuota, strconv.FormatInt(res.CpuQuota, 10)),

@@ -44,6 +44,8 @@ const (
 	SandboxCPUQuota  = "io.kubernetes.cri.sandbox-cpu-quota"
 	SandboxCPUShares = "io.kubernetes.cri.sandbox-cpu-shares"
 
+	SandboxCDIDevices = "cdi.k8s.io/sandbox_devices"
+
 	// SandboxMemory is the initial amount of memory associated with this sandbox. This is calculated as the sum
 	// of container memory, optionally provided by Kubelet (introduced in 1.23) as part of the PodSandboxConfig.
 	SandboxMem = "io.kubernetes.cri.sandbox-memory"
